@@ -1,0 +1,4 @@
+torch==2.0.1
+yolov5==7.0.12
+opencv-python==4.7.0.72
+
