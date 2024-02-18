@@ -113,6 +113,7 @@ def display_video(
     verbose: bool = True,
     draw_fps: bool = True,
     record_file_name: str = None,
+    frame_failed_read_limit: int = 4,
     mouse_event_callback = None,
 ):
     """Play video file
@@ -126,6 +127,7 @@ def display_video(
         verbose (bool, optional): verbose output. Defaults to True.
         draw_fps (bool, optional): draw fps to frames. Defaults to True.
         record_file_name (str, optional): recording file name. Defaults to None.
+        frame_failed_read_limit (int, optional): stop after N attempts. Defaults to 4.
         mouse_event_callback (Any, optional): mouse callback `function(event, x, y, flags, params)`. Defaults to None.
     
     Note:
@@ -153,6 +155,7 @@ def display_video(
 
     time_prev = [time.time()]
     time_real_fps = time.time()
+    frame_failed_read_counter = 0
     frame_fps_counter = 0
     frame_real_fps = 0
     while True:
@@ -193,9 +196,14 @@ def display_video(
             else:
                 cap.grab()
         else:
+            frame_failed_read_counter = frame_failed_read_counter + 1
             if verbose: 
-                print(f'Error ({window_title}): failed to read a frame!')
-            
+                print(f'Error ({window_title}): failed to read a frame ({frame_failed_read_counter}/{frame_failed_read_limit})!')
+        
+        # if failed read N frames, exit
+        if frame_failed_read_counter >= frame_failed_read_limit:
+            break
+        
         # process events
         key = cv2.waitKey(30)
         if (key & 0xFF == ord('q')) or key == 27:

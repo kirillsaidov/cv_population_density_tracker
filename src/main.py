@@ -1,7 +1,12 @@
 # module main
 
+# system
+import os
+from datetime import datetime, timedelta
+
 # cv, data processing
 import cv2
+import pandas as pd
 
 # custom
 from auxiliary import *
@@ -12,7 +17,24 @@ from yolov5model import *
 model = YOLOv5Model(weights='assets/weights/pedestrian_yolov5m_p79.pt', conf=0.5)
 
 
-def update(params):
+def log_density(csv_filename: str, dt: datetime, people: int, area: float):
+    df = pd.DataFrame.from_dict({
+        'datetime': dt,
+        'people': [people],
+        'area': [area],
+        'density': [people/area],
+    })
+    
+    # check if exists
+    if os.path.exists(csv_filename):
+        df_old = pd.read_csv(csv_filename)
+        df = pd.concat([df_old, df])
+    
+    # save data
+    df.to_csv(csv_filename, index=False)
+
+
+def update(params: dict):
     frame = params['frame']
     
     # detect
@@ -29,6 +51,12 @@ def update(params):
     
     # draw                    
     draw(frame, params)
+    
+    # save density data
+    dt_now = datetime.now()
+    if dt_now - params['datetime'] > timedelta(seconds=10):
+        log_density(params['csv'], dt_now, nobj, params['area'])
+        params['datetime'] = dt_now
 
     return frame
 
@@ -56,11 +84,22 @@ def draw(frame: cv2.Mat, params: dict = None):
                 thickness=2,
                 lineType=cv2.LINE_AA
             )
-    
+
 
 if __name__ == '__main__':
     update_params = {
-        'area': 25,
+        'datetime': datetime.now(),
+        'csv': 'population_density.csv',
         'hide_debug_info': False,
+        'area': 25,
     }
-    display_video('assets/test_media/test_mix_1.mp4', func=update, func_params=update_params, frame_rate=3, draw_fps=True)
+    
+    # run
+    display_video(
+        'assets/test_media/test_mix_1.mp4', 
+        func=update, 
+        func_params=update_params, 
+        frame_rate=2, 
+        draw_fps=True, 
+        frame_size=(720, 480)
+    )
