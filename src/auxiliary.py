@@ -103,6 +103,24 @@ def frame_rate_elapsed(time_prev: list, frame_rate: int) -> bool:
     return False
 
 
+def frame_rate_elapsed_v2(counter: list[int], pfps: int, source_fps: int) -> bool:
+    """Controls frame rate
+
+    Args:
+        counter (list(int)): previously updated time in a list
+        pfps (int): process fps
+        source_fps (int): source fps
+    
+    Returns:
+        bool: True upon frame elapsed (move on to next frame)
+    """
+    if (pfps * counter[0]) % source_fps == 0:
+        counter[0] = 0
+        return True
+    
+    return False
+
+
 def display_video(
     video_path: str, 
     window_title: str = 'VIDEO', 
@@ -114,6 +132,7 @@ def display_video(
     draw_fps: bool = True,
     record_file_name: str = None,
     frame_failed_read_limit: int = 4,
+    wait_per_frame_secs: int = 1,
     mouse_event_callback = None,
 ):
     """Play video file
@@ -126,7 +145,7 @@ def display_video(
         frame_size (tuple, optional): resize frame. Defaults to (1080, 720).
         verbose (bool, optional): verbose output. Defaults to True.
         draw_fps (bool, optional): draw fps to frames. Defaults to True.
-        record_file_name (str, optional): recording file name. Defaults to None.
+        record_file_name (str, optional): MP4 recording file name. Defaults to None.
         frame_failed_read_limit (int, optional): stop after N attempts. Defaults to 4.
         mouse_event_callback (Any, optional): mouse callback `function(event, x, y, flags, params)`. Defaults to None.
     
@@ -140,12 +159,15 @@ def display_video(
     # open video capture
     cap = cv2.VideoCapture(video_path)
     assert cap.isOpened(), "Failed to open VideoCapture"
-        
+    
+    # find video fps
+    cap_fps = cap.get(cv2.CAP_PROP_FPS)
+    
     # create video writer
     video_writer = None if record_file_name is None else cv2.VideoWriter(
         record_file_name, 
         cv2.VideoWriter_fourcc('M','J','P','G'), 
-        24, 
+        frame_rate if frame_rate < cap_fps else cap_fps, 
         (frame_size[0], frame_size[1])
     )
     
@@ -157,13 +179,15 @@ def display_video(
     time_real_fps = time.time()
     frame_failed_read_counter = 0
     frame_fps_counter = 0
+    frame_fps_elapsed_counter = 0
     frame_real_fps = 0
     while True:
         ret, frame = cap.read()
+        frame_fps_elapsed_counter += 1
         if ret:
-            if frame_rate_elapsed(time_prev, frame_rate): 
-                frame_fps_counter = frame_fps_counter + 1
-                           
+            if frame_rate_elapsed_v2([frame_fps_elapsed_counter], frame_rate, cap_fps):          
+                frame_fps_counter += 1
+                
                 # resize frame to the desired size
                 frame = image_resize(frame, width=frame_size[0], height=frame_size[1])
                 
@@ -195,6 +219,7 @@ def display_video(
                 if video_writer: video_writer.write(frame)
             else:
                 cap.grab()
+                continue
         else:
             frame_failed_read_counter = frame_failed_read_counter + 1
             if verbose: 
@@ -205,7 +230,7 @@ def display_video(
             break
         
         # process events
-        key = cv2.waitKey(30)
+        key = cv2.waitKey(int(float(wait_per_frame_secs) / float(frame_rate) * 1000))
         if (key & 0xFF == ord('q')) or key == 27:
             break
             

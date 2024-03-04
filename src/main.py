@@ -2,6 +2,7 @@
 
 # system
 import os
+import time
 from datetime import datetime, timedelta
 
 # cv, data processing
@@ -14,7 +15,7 @@ from yolov5model import *
 
 
 # init
-model = YOLOv5Model(weights='assets/weights/pedestrian_yolov5m_p79.pt', conf=0.5)
+model = YOLOv5Model(weights='assets/weights/pedestrian_yolov5m_p79.pt', conf=0.7)
 
 
 def log_density(csv_filename: str, dt: datetime, people: int, area: float):
@@ -54,7 +55,7 @@ def update(params: dict):
     
     # save density data
     dt_now = datetime.now()
-    if dt_now - params['datetime'] > timedelta(seconds=10):
+    if dt_now - params['datetime'] > timedelta(seconds=params['period_secs']):
         log_density(params['csv'], dt_now, nobj, params['area'])
         params['datetime'] = dt_now
 
@@ -92,14 +93,21 @@ if __name__ == '__main__':
         'csv': 'population_density.csv',
         'hide_debug_info': False,
         'area': 25,
+        'period_secs': 59,
     }
+    
+    # check if file exists and delete
+    if os.path.exists(update_params['csv']): update_params['csv'] = f'{int(time.time())}_' + update_params['csv']
     
     # run
     display_video(
-        'assets/test_media/test_mix_1.mp4', 
+        # 'assets/test_media/test_mix_1.mp4', 
+        'assets/test_media/video.avi', 
         func=update, 
         func_params=update_params, 
-        frame_rate=2, 
+        frame_rate=1,
         draw_fps=True, 
-        frame_size=(720, 480)
+        frame_size=(720, 480),
+        wait_per_frame_secs=0.8,
+        record_file_name='assets/test_media/rec_video.avi',
     )
